@@ -4,6 +4,7 @@ GENERAL
   - hg push git@...
   - hg fetch [remote] (remote is url, hg alias or hg-git remote)
   - hg clone url
+* fail nicely when the remote_name is not there
 * more tests
 * submodules?
 * .gitignore, etc - try to convert? 
@@ -14,6 +15,7 @@ PUSH
 * push with branch names (w/ proper error messages)
 * explain what branch mapping policy determined when updating refs
 * convert tags to git (local and .hgtags entries)
+* add a warning for a non-fast forward push
 
 FETCH
 ===========
@@ -22,12 +24,13 @@ FETCH
 MAPPING ISSUES
 ==============
 Created in Hg:
-* explicit file renames
-* named branches
+* named branches #
+* merges with renames - dont convert back properly for some reason
 
 Created in Git:
-* octopus merge explode/implode
 * different committer in Git objects
+* encoding field
+* octopus merge explode/implode
 
 WEBSITE
 ===========
