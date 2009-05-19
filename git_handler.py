@@ -125,6 +125,7 @@ class GitHandler(object):
     def push(self, remote_name):
         self.ui.status(_("pushing to : %s\n") % remote_name)
         self.export()
+        self.update_remote_references(remote_name)
         self.upload_pack(remote_name)
 
     def remote_add(self, remote_name, git_url):
@@ -155,9 +156,35 @@ class GitHandler(object):
         return self._config['remote.' + remote_name + '.url']
 
     def update_references(self):
-        # TODO : if bookmarks exist, add them as git branches
+        try:
+            # We only care about bookmarks of the form 'name',
+            # not 'remote/name'.
+            def is_local_ref(item): return item[0].count('/') == 0
+            bms = bookmarks.parse(self.repo)
+            bms = dict(filter(is_local_ref, bms.items()))
+
+            # Create a local Git branch name for each
+            # Mercurial bookmark.
+            for key in bms:
+                hg_sha  = hex(bms[key])
+                git_sha = self.map_git_get(hg_sha)
+                self.git.set_ref('refs/heads/' + key, git_sha)
+        except AttributeError:
+            # No bookmarks extension
+            pass
+
         c = self.map_git_get(hex(self.repo.changelog.tip()))
         self.git.set_ref('refs/heads/master', c)
+
+    # Make sure there's a refs/remotes/remote_name/name
+    #           for every refs/heads/name
+    def update_remote_references(self, remote_name):
+        self.git.set_remote_refs(self.local_heads(), remote_name)
+
+    def local_heads(self):
+        def is_local_head(item): return item[0].startswith('refs/heads')
+        refs = self.git.get_refs()
+        return dict(filter(is_local_head, refs.items()))
 
     def export_git_objects(self):
         self.ui.status(_("exporting git objects\n"))
@@ -298,12 +325,17 @@ class GitHandler(object):
                     trees['/'] = []
                 trees['/'].append(fileentry)
 
-        # sort by tree depth, so we write the deepest trees first
         dirs = trees.keys()
-        dirs.sort(lambda a, b: len(b.split('/'))-len(a.split('/')))
-        dirs.remove('/')
-        dirs.append('/')
-        
+        if dirs:
+            # sort by tree depth, so we write the deepest trees first
+            dirs.sort(lambda a, b: len(b.split('/'))-len(a.split('/')))
+            dirs.remove('/')
+            dirs.append('/')
+        else:
+            # manifest is empty => make empty root tree
+            trees['/'] = []
+            dirs = ['/']
+
         # write all the trees
         tree_sha = None
         tree_shas = {}
@@ -369,6 +401,13 @@ class GitHandler(object):
                     if local_ref:
                         if not local_ref == refs[ref_name]:
                             changed[ref_name] = local_ref
+        
+        # Also push any local branches not on the server yet
+        for head in self.local_heads():
+            if not head in refs:
+                ref = self.git.ref(head)
+                changed[head] = ref
+
         return changed
 
     # takes a list of shas the server wants and shas the server has
@@ -393,7 +432,7 @@ class GitHandler(object):
             changes = list()
             changes.append((tree, path))
             for (mode, name, sha) in tree.entries():
-                if mode == 57344: # TODO : properly handle submodules and document what 57344 means
+                if mode == 0160000: # TODO : properly handle submodules and document what 57344 means
                     continue
                 if sha in seen:
                     continue
@@ -488,9 +527,9 @@ class GitHandler(object):
     def convert_git_int_mode(self, mode):
 	# TODO : make these into constants
         convert = {
-         33188: '',
-         40960: 'l',
-         33261: 'x'}
+         0100644: '',
+         0100755: 'x',
+         0120000: 'l'}
         if mode in convert:
             return convert[mode]
         return ''
@@ -517,8 +556,8 @@ class GitHandler(object):
     def pseudo_import_git_commit(self, commit):
         (strip_message, hg_renames, hg_branch) = self.extract_hg_metadata(commit.message)
         cs = self.map_hg_get(commit.id)
-        p1 = "0" * 40
-        p2 = "0" * 40
+        p1 = nullid
+        p2 = nullid
         if len(commit.parents) > 0:
             sha = commit.parents[0]
             p1 = self.map_hg_get(sha)
@@ -529,7 +568,7 @@ class GitHandler(object):
             # TODO : map extra parents to the extras file
             pass
         # saving rename info
-        if (not (p2 == "0"*40) or (p1 == "0"*40)):
+        if (not (p2 == nullid) or (p1 == nullid)):
             self.renames[cs] = {}
         else:
             self.renames[cs] = self.renames[p1].copy()
@@ -559,8 +598,8 @@ class GitHandler(object):
                 copied_path = None
             return context.memfilectx(f, data, 'l' in e, 'x' in e, copied_path)
 
-        p1 = "0" * 40
-        p2 = "0" * 40
+        p1 = nullid
+        p2 = nullid
         if len(commit.parents) > 0:
             sha = commit.parents[0]
             p1 = self.map_hg_get(sha)
@@ -575,7 +614,7 @@ class GitHandler(object):
         files = self.git.get_files_changed(commit)
 
         # wierd hack for explicit file renames in first but not second branch
-        if not (p2 == "0"*40):
+        if not (p2 == nullid):
             vals = [item for item in self.renames[p1].values() if not item in self.renames[p2].values()]
             for removefile in vals:
                 files.remove(removefile)
@@ -608,7 +647,7 @@ class GitHandler(object):
         gitsha = commit.id
         
         # saving rename info
-        if (not (p2 == "0"*40) or (p1 == "0"*40)):
+        if (not (p2 == nullid) or (p1 == nullid)):
             self.renames[cs] = {}
         else:
             self.renames[cs] = self.renames[p1].copy()
