@@ -85,7 +85,7 @@ def gfetch(ui, repo, remote_name='origin'):
     repo.ui.status(_("pulling from git url\n"))
     git = GitHandler(repo, ui)
     git.fetch(remote_name)
-
+    
 commands.norepo += " gclone"
 cmdtable = {
   "gclone":
