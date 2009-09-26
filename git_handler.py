@@ -143,7 +143,7 @@ class GitHandler(object):
                             if sha != old_refs.get(ref)]
             new = [bin(self.map_hg_get(new_refs[ref])) for ref in changed_refs]
             old = dict( (bin(self.map_hg_get(old_refs[r])), 1)
-                       for r in changed_refs)
+                       for r in changed_refs if r in old_refs)
 
             return old, new
         except HangupException:
@@ -306,7 +306,9 @@ class GitHandler(object):
             extra_message += "branch : " + ctx.branch() + "\n"
 
         renames = []
-        for f in ctx:
+        for f in ctx.files():
+            if f not in ctx.manifest():
+                continue
             rename = ctx.filectx(f).renamed()
             if rename:
                 renames.append((rename[0], f))
@@ -537,12 +539,13 @@ class GitHandler(object):
         new_refs = refs.copy()
 
         #The remote repo is empty and the local one doesn't have bookmarks/tags
-        if not revs and refs.keys()[0] == 'capabilities^{}':
+        if refs.keys()[0] == 'capabilities^{}':
             del new_refs['capabilities^{}']
-            tip = hex(self.repo.lookup('tip'))
-            bookmarks.bookmark(self.ui, self.repo, 'master', tip)
-            new_refs['refs/heads/master'] = self.map_git_get(tip)
-            return new_refs
+            if not self.local_heads():
+                tip = hex(self.repo.lookup('tip'))
+                bookmarks.bookmark(self.ui, self.repo, 'master', tip)
+                bookmarks.setcurrent(self.repo, 'master')
+                new_refs['refs/heads/master'] = self.map_git_get(tip)
 
         for rev in revs:
             ctx = self.repo[rev]
