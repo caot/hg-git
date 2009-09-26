@@ -45,7 +45,7 @@ git add gamma
 commit -m 'add gamma'
 
 # clean merge
-git merge beta
+git merge beta | sed 's/\.{3}//'
 
 cd ..
 mkdir gitrepo2
