@@ -261,7 +261,7 @@ class GitHandler(object):
             author = author + ' <none@none>'
 
         if 'author' in ctx.extra():
-            author = apply_delta(author, ctx.extra()['author'])
+            author = "".join(apply_delta(author, ctx.extra()['author']))
 
         return author
 
@@ -289,7 +289,7 @@ class GitHandler(object):
 
         message = ctx.description() + "\n"
         if 'message' in extra:
-            message = apply_delta(message, extra['message'])
+            message = "".join(apply_delta(message, extra['message']))
 
         # HG EXTRA INFORMATION
         add_extras = False
@@ -363,7 +363,7 @@ class GitHandler(object):
                 if sha in self.git.object_store:
                     obj = self.git.get_object(sha)
                     while isinstance(obj, Tag):
-                        obj_type, sha = obj.get_object()
+                        obj_type, sha = obj._get_object()
                         obj = self.git.get_object(sha)
                     if isinstance (obj, Commit) and sha not in seenheads:
                         seenheads.add(sha)
@@ -666,7 +666,7 @@ class GitHandler(object):
                         sha = self.map_hg_get(refs[k])
                         self.tags[ref_name] = sha
                     elif isinstance (obj, Tag): # annotated
-                        (obj_type, obj_sha) = obj.get_object()
+                        (obj_type, obj_sha) = obj._get_object()
                         obj = self.git.get_object(obj_sha)
                         if isinstance (obj, Commit):
                             sha = self.map_hg_get(obj_sha)
