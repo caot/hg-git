@@ -22,6 +22,46 @@ import _ssh
 import util
 from overlay import overlayrepo
 
+class GitProgress(object):
+    """convert git server progress strings into mercurial progress"""
+    def __init__(self, ui):
+        self.ui = ui
+
+        self.lasttopic = None
+        self.msgbuf = ''
+
+    def progress(self, msg):
+        # 'Counting objects: 33640, done.\n'
+        # 'Compressing objects:   0% (1/9955)   \r
+        msgs = re.split('[\r\n]', self.msgbuf + msg)
+        self.msgbuf = msgs.pop()
+
+        for msg in msgs:
+            td = msg.split(':', 1)
+            data = td.pop()
+            if not td:
+                self.flush(data)
+                continue
+            topic = td[0]
+
+            m = re.search('\((\d+)/(\d+)\)', data)
+            if m:
+                if self.lasttopic and self.lasttopic != topic:
+                    self.flush()
+                self.lasttopic = topic
+
+                pos, total = map(int, m.group(1, 2))
+                util.progress(self.ui, topic, pos, total=total)
+            else:
+                self.flush(msg)
+
+    def flush(self, msg=None):
+        if self.lasttopic:
+            util.progress(self.ui, self.lasttopic, None)
+        self.lasttopic = None
+        if msg:
+            self.ui.note(msg + '\n')
+
 class GitHandler(object):
     mapfile = 'git-mapfile'
     tagsfile = 'git-tags'
@@ -95,6 +135,7 @@ class GitHandler(object):
 
     def import_commits(self, remote_name):
         self.import_git_objects(remote_name)
+        self.update_hg_bookmarks(self.git.get_refs())
         self.save_map()
 
     def fetch(self, remote, heads):
@@ -160,8 +201,11 @@ class GitHandler(object):
             changed_refs = [ref for ref, sha in new_refs.iteritems()
                             if sha != old_refs.get(ref)]
             new = [bin(self.map_hg_get(new_refs[ref])) for ref in changed_refs]
-            old = dict( (bin(self.map_hg_get(old_refs[r])), 1)
-                       for r in old_refs)
+            old = {}
+            for r in old_refs:
+                old_ref = self.map_hg_get(old_refs[r])
+                if old_ref:
+                    old[bin(old_ref)] = 1
 
             return old, new
         except (HangupException, GitProtocolError), e:
@@ -745,14 +789,18 @@ class GitHandler(object):
                         raise hgutil.Abort("ambiguous reference %s: %r" % (h, r))
             else:
                 want = [sha for ref, sha in refs.iteritems()
-                        if not ref.endswith('^{}')]
+                        if not ref.endswith('^{}')
+                        and ( ref.startswith('refs/heads/') or ref.startswith('refs/tags/') ) ]
             want = [x for x in want if x not in self.git]
             return want
         f, commit = self.git.object_store.add_pack()
         try:
             try:
-                return client.fetch_pack(path, determine_wants, graphwalker,
-                                         f.write, self.ui.status)
+                progress = GitProgress(self.ui)
+                ret = client.fetch_pack(path, determine_wants, graphwalker,
+                                        f.write, progress.progress)
+                progress.flush()
+                return ret
             except (HangupException, GitProtocolError), e:
                 raise hgutil.Abort(_("git remote error: ") + str(e))
         finally:
@@ -766,7 +814,9 @@ class GitHandler(object):
         # Create a local Git branch name for each
         # Mercurial bookmark.
         for key in heads:
-            self.git.refs['refs/heads/' + key] = self.map_git_get(heads[key])
+            git_ref = self.map_git_get(heads[key])
+            if git_ref:
+                self.git.refs['refs/heads/' + key] = self.map_git_get(heads[key])
 
     def export_hg_tags(self):
         for tag, sha in self.repo.tags().iteritems():
@@ -1015,11 +1065,20 @@ class GitHandler(object):
                 else:
                     hostpath_seper = '/'
 
+                port = None
                 host, path = hostpath.split(hostpath_seper, 1)
                 if hostpath_seper == '/':
                     transportpath = '/' + path
                 else:
-                    transportpath = path
-                return transport(host, thin_packs=False), transportpath
+                    # port number should be recognized
+                    m = re.match('^(?P<port>\d+)?(?P<path>.*)$', path)
+                    if m.group('port'):
+                        client.port = m.group('port')
+                        port = client.port
+                        transportpath = m.group('path')
+                    else:
+                        transportpath = path
+
+                return transport(host, thin_packs=False, port=port), transportpath
         # if its not git or git+ssh, try a local url..
         return client.SubprocessGitClient(thin_packs=False), uri
