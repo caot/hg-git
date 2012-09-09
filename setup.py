@@ -3,9 +3,15 @@ try:
 except:
     from distutils.core import setup
 
+try:
+    from collections import OrderedDict
+    extra_req = []
+except ImportError:
+    extra_req = 'ordereddict>=1.1'
+
 setup(
     name='hg-git',
-    version='0.3.3',
+    version='0.4.0',
     author='Scott Chacon',
     maintainer='Augie Fackler',
     maintainer_email='durin42@gmail.com',
@@ -20,5 +26,5 @@ project that is in Git.  A bridger of worlds, this plugin be.
     license='GPLv2',
     packages=['hggit'],
     package_data={ 'hggit': ['help/git.rst'] },
-    install_requires=['dulwich>=0.8.0'],
+    install_requires=['dulwich>=0.8.0'] + extra_req,
 )
