@@ -57,18 +57,14 @@ TODO stop using this when we're 1.5 only
   $ hgcommit -m 'rename alpha to beta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:05c2bcbe
 
   $ hg branch gamma | grep -v 'permanent and global'
   marked working directory as branch gamma
   $ hgcommit -m 'started branch gamma'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:296802ef
 
   $ hg log --graph | $filterhash | egrep -v ': *(not-master|master)'
   @  changeset:   2:05aed681ccb3

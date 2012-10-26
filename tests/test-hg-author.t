@@ -54,71 +54,55 @@ bail if the user does not have dulwich
   $ hgcommit -u "test" -m 'add beta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:cffa0e8d
 
   $ echo gamma >> beta
   $ hgcommit -u "test <test@example.com> (comment)" -m 'modify beta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:2b9ec6a4
 
   $ echo gamma > gamma
   $ hg add gamma
   $ hgcommit -u "<test@example.com>" -m 'add gamma'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:fee30180
 
   $ echo delta > delta
   $ hg add delta
   $ hgcommit -u "name<test@example.com>" -m 'add delta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:d1659250
 
   $ echo epsilon > epsilon
   $ hg add epsilon
   $ hgcommit -u "name <test@example.com" -m 'add epsilon'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:ee985f12
 
   $ echo zeta > zeta
   $ hg add zeta
   $ hgcommit -u " test " -m 'add zeta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:d21e26b4
 
   $ echo eta > eta
   $ hg add eta
   $ hgcommit -u "test < test@example.com >" -m 'add eta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:8c878c97
 
   $ echo theta > theta
   $ hg add theta
   $ hgcommit -u "test >test@example.com>" -m 'add theta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:1e03e913
 
   $ hg log --graph | egrep -v ': *(not-master|master)'
   @  changeset:   8:d3c51ce68cfd

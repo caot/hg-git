@@ -71,8 +71,6 @@ bail if the user does not have dulwich
   $ hg commit -m 'fix for beta'
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:3b7fd1b3
 
   $ cd ..

@@ -279,7 +279,10 @@ class GitHandler(object):
         if remote_name and new_refs:
             for ref, new_sha in new_refs.iteritems():
                 if new_sha != old_refs.get(ref):
-                    self.ui.status("    %s::%s => GIT:%s\n" %
+                    self.ui.note("    %s::%s => GIT:%s\n" %
+                                   (remote_name, ref, new_sha[0:8]))
+                else:
+                    self.ui.debug("    %s::%s => GIT:%s\n" %
                                    (remote_name, ref, new_sha[0:8]))
 
             self.update_remote_branches(remote_name, new_refs)
@@ -336,7 +339,7 @@ class GitHandler(object):
         export = [node for node in nodes if not hex(node) in self._map_hg]
         total = len(export)
         if total:
-            self.ui.status(_("exporting hg objects to git\n"))
+            self.ui.note(_("exporting hg objects to git\n"))
         for i, rev in enumerate(export):
             util.progress(self.ui, 'exporting', i, total=total)
             ctx = self.repo.changectx(rev)
@@ -887,15 +890,17 @@ class GitHandler(object):
 
         #The remote repo is empty and the local one doesn't have bookmarks/tags
         if refs.keys()[0] == 'capabilities^{}':
-            del new_refs['capabilities^{}']
             if not self.local_heads():
-                tip = hex(self.repo.lookup('tip'))
-                try:
-                    commands.bookmark(self.ui, self.repo, 'master', tip, force=True)
-                except NameError:
-                    bookmarks.bookmark(self.ui, self.repo, 'master', tip, force=True)
-                bookmarks.setcurrent(self.repo, 'master')
-                new_refs['refs/heads/master'] = self.map_git_get(tip)
+                tip = self.repo.lookup('tip')
+                if tip != nullid:
+                    del new_refs['capabilities^{}']
+                    tip = hex(tip)
+                    try:
+                        commands.bookmark(self.ui, self.repo, 'master', tip, force=True)
+                    except NameError:
+                        bookmarks.bookmark(self.ui, self.repo, 'master', tip, force=True)
+                    bookmarks.setcurrent(self.repo, 'master')
+                    new_refs['refs/heads/master'] = self.map_git_get(tip)
 
         for rev in revs:
             ctx = self.repo[rev]
@@ -964,7 +969,7 @@ class GitHandler(object):
         return new_refs
 
 
-    def fetch_pack(self, remote_name, heads):
+    def fetch_pack(self, remote_name, heads=None):
         client, path = self.get_transport_and_path(remote_name)
         graphwalker = self.git.get_graph_walker()
         def determine_wants(refs):

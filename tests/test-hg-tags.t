@@ -52,10 +52,7 @@ bail if the user does not have dulwich
   $ hgtag alpha
   $ hg push
   pushing to $TESTTMP/gitrepo
-  exporting hg objects to git
   searching for changes
-      default::refs/tags/alpha => GIT:7eeab2ea
-      default::refs/heads/master => GIT:9a2616b9
 
   $ hg log --graph | egrep -v ': *(not-master|master)'
   @  changeset:   1:d529e9229f6d

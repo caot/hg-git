@@ -115,9 +115,7 @@ allow commits despite working copy presense
   $ hg commit -m 'Update subrepo2 from hg' | grep -v "committing subrepository" || true
   $ hg push
   pushing to $TESTTMP/gitrepo1
-  exporting hg objects to git
   searching for changes
-      default::refs/heads/master => GIT:4663c492
   $ cd ..
   $ cd gitrepo1
   $ echo % there shall be two gitlink entries, with values matching that in .hgsubstate
