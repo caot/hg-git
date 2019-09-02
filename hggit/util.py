@@ -1,5 +1,6 @@
 """Compatibility functions for old Mercurial versions and other utility
 functions."""
+import os
 import re
 import urllib
 
@@ -14,6 +15,7 @@ from mercurial import (
     error,
     lock as lockmod,
     util as hgutil,
+    registrar,
 )
 
 gitschemes = ('git', 'git+ssh', 'git+http', 'git+https')
@@ -68,17 +70,17 @@ def isgitsshuri(uri):
 
     Tests:
 
-    >>> print isgitsshuri('http://fqdn.com/hg')
+    >>> print(isgitsshuri('http://fqdn.com/hg'))
     False
-    >>> print isgitsshuri('http://fqdn.com/test.git')
+    >>> print(isgitsshuri('http://fqdn.com/test.git'))
     False
-    >>> print isgitsshuri('git@github.com:user/repo.git')
+    >>> print(isgitsshuri('git@github.com:user/repo.git'))
     True
-    >>> print isgitsshuri('github-123.com:user/repo.git')
+    >>> print(isgitsshuri('github-123.com:user/repo.git'))
     True
-    >>> print isgitsshuri('git@127.0.0.1:repo.git')
+    >>> print(isgitsshuri('git@127.0.0.1:repo.git'))
     True
-    >>> print isgitsshuri('git@[2001:db8::1]:repository.git')
+    >>> print(isgitsshuri('git@[2001:db8::1]:repository.git'))
     True
     """
     for scheme in gitschemes:
@@ -141,7 +143,82 @@ def checksafessh(host):
 
     Raises an error.Abort when the url is unsafe.
     """
-    host = urllib.unquote(host)
+    host = urllib.parse.unquote(host)
     if host.startswith('-'):
         raise error.Abort(_('potentially unsafe hostname: %r') %
                           (host,))
+
+
+def get_value(d, key):
+    v = d.get(key, None)
+
+    if not None and type(key) == str:
+        k = key.encode('utf-8')
+        v = d.get(k, None)
+
+    if v:
+        return v
+
+    raise(Exception('%s is not in the dict' % key))
+
+
+def to_bytes(v):
+    if type(v) != bytes:
+        v = str(v).encode('utf-8')
+
+    return v
+
+
+def convert(data, frm=str, to=bytes):
+    if isinstance(data, frm):
+        return to(data, 'utf-8')
+
+    if isinstance(data, dict):
+        return dict(map(convert, data.items()))
+
+    if isinstance(data, tuple):
+        return tuple(map(convert, data))
+
+    if isinstance(data, list):
+        return list(map(convert, data))
+
+    return data
+
+
+def to_str(v):
+    if type(v) == bytes:
+        v = v.decode('utf-8')
+
+    return v
+
+# def join(v1, v2, is_types=True):
+#     v = to_bytes(v1) + to_bytes(v2)
+#
+#     if is_types:
+#         return v
+#
+#     return v.decode('utf-8')
+
+
+def path_join(a, *p):
+    p2 = []
+    for x in p:
+        p2.append(to_bytes(x))
+    v = os.path.join_orig(to_bytes(a), *p2)
+
+    return v
+
+
+def lstrip(vstr, p):
+    return vstr.lstrip(to_bytes(p))
+
+
+class command(registrar.command):
+    def _doregister(self, func, name, options=(), synopsis=None,
+                    norepo=False, optionalrepo=False, inferrepo=False,
+                    intents=None, helpcategory=None, helpbasic=False):
+        if type(name) == str:
+            name = name.encode('utf-8')
+        return super(command, self)._doregister(func, name, options=options, synopsis=synopsis,
+                    norepo=norepo, optionalrepo=optionalrepo, inferrepo=inferrepo,
+                    intents=intents, helpcategory=helpcategory, helpbasic=helpbasic)

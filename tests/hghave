@@ -6,7 +6,7 @@ prefixed with "no-", the absence of feature is tested.
 
 from __future__ import absolute_import, print_function
 
-import hghave
+from . import hghave
 import optparse
 import os
 import sys

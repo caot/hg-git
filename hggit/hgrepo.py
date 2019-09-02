@@ -4,9 +4,9 @@ from mercurial import (
 )
 from mercurial.node import bin
 
-from git_handler import GitHandler
-from gitrepo import gitrepo
-import util
+from .git_handler import GitHandler
+from .gitrepo import gitrepo
+from . import util
 
 
 def generate_repo_subclass(baseclass):
@@ -45,13 +45,13 @@ def generate_repo_subclass(baseclass):
         def _findtags(self):
             (tags, tagtypes) = super(hgrepo, self)._findtags()
 
-            for tag, rev in self.githandler.tags.iteritems():
-                if isinstance(tag, unicode):
+            for tag, rev in self.githandler.tags.items():
+                if isinstance(tag, str):
                     tag = tag.encode('utf-8')
                 tags[tag] = bin(rev)
                 tagtypes[tag] = 'git'
-            for tag, rev in self.githandler.remote_refs.iteritems():
-                if isinstance(tag, unicode):
+            for tag, rev in self.githandler.remote_refs.items():
+                if isinstance(tag, str):
                     tag = tag.encode('utf-8')
                 tags[tag] = rev
                 tagtypes[tag] = 'git-remote'

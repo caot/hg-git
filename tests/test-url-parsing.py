@@ -3,11 +3,12 @@ import sys
 try:
     import dulwich
 except ImportError:
-    print "skipped: missing feature: dulwich"
+    print("skipped: missing feature: dulwich")
     sys.exit(80)
 
 import os, tempfile, unittest, shutil
 from mercurial import ui, hg, commands
+from hggit import util
 
 sys.path.append(os.path.join(os.path.dirname(__file__), os.path.pardir))
 
@@ -18,6 +19,7 @@ class TestUrlParsing(object):
     def setUp(self):
         # create a test repo location.
         self.tmpdir = tempfile.mkdtemp('hg-git_url-test')
+        self.tmpdir = util.to_bytes(self.tmpdir)
         commands.init(ui.ui(), self.tmpdir)
         repo = hg.repository(ui.ui(), self.tmpdir)
         self.handler = GitHandler(repo, ui.ui())
@@ -27,8 +29,8 @@ class TestUrlParsing(object):
         shutil.rmtree(self.tmpdir)
 
     def assertEquals(self, l, r):
-        print '%% expect %r' % (r, )
-        print l
+        print('%% expect %r' % (r, ))
+        print(l)
         assert l == r
 
     def test_ssh_github_style_slash(self):

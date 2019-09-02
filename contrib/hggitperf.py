@@ -5,12 +5,12 @@ This requires both the hggit and hggitperf extensions to be enabled and
 available.
 '''
 
-from mercurial import cmdutil
+from mercurial import registrar
 import time, os, tempfile
 import functools
 
 cmdtable = {}
-command = cmdutil.command(cmdtable)
+command = registrar.command(cmdtable)
 
 # the timer functions are copied from mercurial/contrib/perf.py
 def gettimer(ui, opts=None):

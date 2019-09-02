@@ -16,7 +16,7 @@ if os.name =='nt':
         logfn('# Killing daemon process %d' % pid)
         PROCESS_TERMINATE = 1
         PROCESS_QUERY_INFORMATION = 0x400
-        SYNCHRONIZE = 0x00100000L
+        SYNCHRONIZE = 0x00100000
         WAIT_OBJECT_0 = 0
         WAIT_TIMEOUT = 258
         handle = ctypes.windll.kernel32.OpenProcess(
@@ -64,7 +64,7 @@ else:
                 os.kill(pid, 0)
             logfn('# Daemon process %d is stuck - really killing it' % pid)
             os.kill(pid, signal.SIGKILL)
-        except OSError, err:
+        except OSError as err:
             if err.errno != errno.ESRCH:
                 raise
 

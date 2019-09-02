@@ -1,9 +1,61 @@
-Hg-Git Mercurial Plugin
-=======================
+Hg-Git Mercurial Plugin in Python 3
+===================================
 
+Python 3: bytes vs str in Mercurial
+-----------------------------------
+
+The following comment is from class hgloader(importlib.machinery.SourceFileLoader),
+referring https://www.mercurial-scm.org/repo/hg-all/file/tip/mercurial/__init__.py
+
+    Custom module loader that transforms source code.
+    
+    When the source code is converted to a code object, we transform
+    certain patterns to be Python 3 compatible. This allows us to write code
+    that is natively Python 2 and compatible with Python 3 without
+    making the code excessively ugly.
+    
+    We do this by transforming the token stream between parse and compile.
+    Implementing transformations invalidates caching assumptions made
+    by the built-in importer. The built-in importer stores a header on
+    saved bytecode files indicating the Python/bytecode version. If the
+    version changes, the cached bytecode is ignored. The Mercurial
+    transformations could change at any time. This means we need to check
+    that cached bytecode was generated with the current transformation
+    code or there could be a mismatch between cached bytecode and what
+    would be generated from this class.
+    
+    We supplement the bytecode caching layer by wrapping ``get_data``
+    and ``set_data``. These functions are called when the
+    ``SourceFileLoader`` retrieves and saves bytecode cache files,
+    respectively. We simply add an additional header on the file. As
+    long as the version in this file is changed when semantics change,
+    cached bytecode should be invalidated when transformations change.
+    
+    The added header has the form ``HG<VERSION>``. That is a literal
+    ``HG`` with 2 binary bytes indicating the transformation version.
+
+The summary behind is from https://gregoryszorc.com/blog/2017/03/13/from-__past__-import-bytes_literals/
+
+    In summary, the hack is a source-transforming module loader for Python.
+    It can be used by Python 3 to import a Python 2 source file while translating 
+    certain primitives to their Python 3 equivalents. It is kind of like 2to3 
+    except it executes at run-time during import. The main goal of the hack was 
+    to facilitate porting Mercurial to Python 3 while deferring having to make 
+    the most invasive - and therefore most annoying - elements of the port in 
+    the canonical source code representation.
+
+For more information, you can refer to the follows;
+
+    https://www.mercurial-scm.org/repo/hg/rev/1c22400db72d
+    https://bz.mercurial-scm.org/show_bug.cgi?id=6195
+    https://stackoverflow.com/questions/57747654/python-3-bytes-vs-str-in-mercurial/57749790#57749790
+
+
+The follows are primary in Python 2
+-----------------------------------
 * Homepage: https://hg-git.github.io/
-* https://bitbucket.org/durin42/hg-git (primary)
-* https://github.com/schacon/hg-git (mirror)
+* https://bitbucket.org/durin42/hg-git
+
 
 This is the Hg-Git plugin for Mercurial, adding the ability to push
 and pull to/from a Git server repository from Hg.  This means you can

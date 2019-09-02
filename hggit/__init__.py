@@ -20,16 +20,28 @@ For more information and instructions, see :hg:`help git`
 # global modules
 import os
 
+
+def hggit_hack():
+    os.path.join_orig = os.path.join
+    os.sep_orig = os.sep
+
+    from . import util
+
+    os.path.join = util.path_join
+    os.sep = util.to_bytes(os.sep)
+
+hggit_hack()
+
+
 # local modules
-import compat
-import gitrepo
-import hgrepo
-import overlay
-import verify
-import util
+from . import compat
+from . import gitrepo
+from . import hgrepo
+from . import overlay
+from . import verify
+from .git_handler import GitHandler
 
 from bisect import insort
-from git_handler import GitHandler
 from mercurial.node import hex
 from mercurial.error import LookupError
 from mercurial.i18n import _
@@ -50,6 +62,7 @@ from mercurial import (
     revset,
     scmutil,
     templatekw,
+    registrar,
 )
 
 # COMPAT: hg 4.7 - demandimport.ignore was renamed to demandimport.IGNORES and
@@ -70,14 +83,13 @@ buglink = 'https://bitbucket.org/durin42/hg-git/issues'
 cmdtable = {}
 configtable = {}
 try:
-    from mercurial import registrar
-    command = registrar.command(cmdtable)
+    command = util.command(cmdtable)
     configitem = registrar.configitem(configtable)
     compat.registerconfigs(configitem)
     templatekeyword = registrar.templatekeyword()
 
 except (ImportError, AttributeError):
-    command = cmdutil.command(cmdtable)
+    command = util.command(cmdtable)
     templatekeyword = compat.templatekeyword()
 
 # support for `hg clone git://github.com/defunkt/facebox.git`
@@ -86,7 +98,7 @@ for _scheme in util.gitschemes:
     hg.schemes[_scheme] = gitrepo
 
 # support for `hg clone localgitrepo`
-_oldlocal = hg.schemes['file']
+_oldlocal = util.get_value(hg.schemes, 'file')
 
 def _isgitdir(path):
     """True if the given file path is a git repo."""
@@ -124,7 +136,7 @@ hg.schemes['file'] = _local
 def _url(orig, path, **kwargs):
     # we'll test for 'git@' then use our heuristic method to determine if it's
     # a git uri
-    if not (path.startswith(os.sep) and ':' in path):
+    if not (path.startswith(os.sep) and b':' in path):
         return orig(path, **kwargs)
 
     # the file path will be everything up until the last slash right before the
@@ -153,8 +165,8 @@ def _httpgitwrapper(orig):
     return httpgitscheme
 
 
-hg.schemes['https'] = _httpgitwrapper(hg.schemes['https'])
-hg.schemes['http'] = _httpgitwrapper(hg.schemes['http'])
+hg.schemes['https'] = _httpgitwrapper(util.get_value(hg.schemes, 'https'))
+hg.schemes['http'] = _httpgitwrapper(util.get_value(hg.schemes, 'http'))
 hgdefaultdest = hg.defaultdest
 
 
@@ -182,10 +194,38 @@ def getversion():
 # defend against tracebacks if we specify -r in 'hg pull'
 def safebranchrevs(orig, lrepo, repo, branches, revs):
     revs, co = orig(lrepo, repo, branches, revs)
-    if hgutil.safehasattr(lrepo, 'changelog') and co not in lrepo.changelog:
+    if not co or hgutil.safehasattr(lrepo, 'changelog') and co not in lrepo.changelog:
         co = None
     return revs, co
 extensions.wrapfunction(hg, 'addbranchrevs', safebranchrevs)
+
+
+''' ref bisect.py
+'''
+def insort_right(a, x, lo=0, hi=None):
+    """Insert item x in list a, and keep it sorted assuming a is sorted.
+
+    If x is already in a, insert it to the right of the rightmost x.
+
+    Optional args lo (default 0) and hi (default len(a)) bound the
+    slice of a to be searched.
+    """
+
+    if lo < 0:
+        raise ValueError('lo must be non-negative')
+    if hi is None:
+        hi = len(a)
+    while lo < hi:
+        mid = (lo+hi)//2
+
+        if x < a[mid]:
+            hi = mid
+        else:
+            lo = mid+1
+    a.insert(lo, x)
+
+
+insort = insort_right
 
 
 def extsetup(ui):
@@ -193,7 +233,7 @@ def extsetup(ui):
         'fromgit': revset_fromgit, 'gitnode': revset_gitnode
     })
     helpdir = os.path.join(os.path.dirname(__file__), 'help')
-    entry = (['git'], _("Working with Git Repositories"),
+    entry = ([b'git'], _("Working with Git Repositories"),
              lambda ui: open(os.path.join(helpdir, 'git.rst')).read())
     insort(help.helptable, entry)
 
@@ -244,8 +284,8 @@ def gclear(ui, repo):
 
 
 @command('gverify',
-         [('r', 'rev', '', _('revision to verify'), _('REV'))],
-         _('[-r REV]'))
+         [(b'r', b'rev', b'', _(b'revision to verify'), _(b'REV'))],
+         _(b'[-r REV]'))
 def gverify(ui, repo, **opts):
     '''verify that a Mercurial rev matches the corresponding Git rev
 
@@ -433,9 +473,9 @@ def _gitnodekw(node, repo):
 
 
 if (hgutil.safehasattr(templatekw, 'templatekeyword') and
-        hgutil.safehasattr(templatekw.templatekeyword._table['node'],
+        hgutil.safehasattr(util.get_value(templatekw.templatekeyword._table, 'node'),
                            '_requires')):
-    @templatekeyword('gitnode', requires={'ctx', 'repo'})
+    @templatekeyword(b'gitnode', requires={'ctx', 'repo'})
     def gitnodekw(context, mapping):
         """:gitnode: String. The Git changeset identification hash, as a
         40 hexadecimal digit string."""

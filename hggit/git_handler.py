@@ -2,11 +2,12 @@ import collections
 import itertools
 import os
 import urllib
-import urllib2
+from urllib import request as urllib2
 import re
-import cStringIO
-import StringIO
+from io import BytesIO as cStringIO
+from io import StringIO
 
+from dulwich import __init__
 from dulwich.errors import HangupException, GitProtocolError
 from dulwich.objects import Blob, Commit, Tag, Tree, parse_timezone
 from dulwich.pack import create_delta, apply_delta
@@ -27,12 +28,12 @@ from mercurial import (
     util as hgutil,
 )
 
-import _ssh
-import compat
-import git2hg
-import hg2git
-import util
-from overlay import overlayrepo
+from . import _ssh
+from . import git2hg
+from . import hg2git
+from . import util
+from . import compat
+from .overlay import overlayrepo
 
 
 RE_GIT_AUTHOR = re.compile('^(.*?) ?\<(.*?)(?:\>(.*))?$')
@@ -164,12 +165,13 @@ class GitHandler(object):
         # have to cope with that. As a workaround, try decoding our
         # (bytes) path to the repo in hg's active encoding and hope
         # for the best.
-        gitpath = self.gitdir.decode(encoding.encoding, encoding.encodingmode)
+        gitpath = self.gitdir.decode(util.to_str(encoding.encoding), util.to_str(encoding.encodingmode))
         # make the git data directory
         if os.path.exists(self.gitdir):
             return Repo(gitpath)
         else:
             os.mkdir(self.gitdir)
+            gitpath = util.to_bytes(gitpath)
             return Repo.init_bare(gitpath)
 
     def init_author_file(self):
@@ -398,7 +400,7 @@ class GitHandler(object):
                     old[bin(old_ref)] = 1
 
             return old, new
-        except (HangupException, GitProtocolError), e:
+        except (HangupException, GitProtocolError) as e:
             raise error.Abort(_("git remote error: ") + str(e))
 
     def push(self, remote, revs, force):
@@ -652,6 +654,7 @@ class GitHandler(object):
 
         >>> from collections import namedtuple
         >>> from mercurial.ui import ui
+        >>> from hggit.git_handler import GitHandler
         >>> mockrepo = namedtuple('localrepo', ['vfs', 'sharedpath', 'path'])
         >>> mockrepo.vfs = ''
         >>> mockrepo.sharedpath = ''
@@ -887,7 +890,7 @@ class GitHandler(object):
         if hgsubdeleted or (not hgsubstate and parentsubdata):
             files['.hgsubstate'] = True, None, None
         elif util.serialize_hgsubstate(hgsubstate) != parentsubdata:
-            files['.hgsubstate'] = False, 0100644, None
+            files['.hgsubstate'] = False, 0o100644, None
 
         # Analyze .hgsub and merge with .gitmodules
         hgsub = None
@@ -897,13 +900,13 @@ class GitHandler(object):
                                                              '.hgsub'))
             for (sm_path, sm_url, sm_name) in gitmodules:
                 hgsub[sm_path] = '[git]' + sm_url
-            files['.hgsub'] = (False, 0100644, None)
+            files['.hgsub'] = (False, 0o100644, None)
         elif (commit.parents and '.gitmodules' in
               self.git[self.git[commit.parents[0]].tree]):
             # no .gitmodules in this commit, however present in the parent
             # mark its hg counterpart as deleted (assuming .hgsub is there
             # due to the same import_git_commit process
-            files['.hgsub'] = (True, 0100644, None)
+            files['.hgsub'] = (True, 0o100644, None)
 
         date = (commit.author_time, -commit.author_timezone)
         text = strip_message
@@ -1121,7 +1124,7 @@ class GitHandler(object):
                                 change_totals.get(Tree, 0),
                                 change_totals.get(Blob, 0)))
             return old_refs, new_refs
-        except (HangupException, GitProtocolError), e:
+        except (HangupException, GitProtocolError) as e:
             raise error.Abort(_("git remote error: ") + str(e))
 
     def get_changed_refs(self, refs, exportable, force):
@@ -1233,7 +1236,7 @@ class GitHandler(object):
                 ret = {}
 
             return ret
-        except (HangupException, GitProtocolError), e:
+        except (HangupException, GitProtocolError) as e:
             raise error.Abort(_("git remote error: ") + str(e))
 
     # REFERENCES HANDLING
@@ -1452,9 +1455,9 @@ class GitHandler(object):
     def convert_git_int_mode(self, mode):
         # TODO: make these into constants
         convert = {
-            0100644: '',
-            0100755: 'x',
-            0120000: 'l'
+            0o100644: '',
+            0o100755: 'x',
+            0o120000: 'l'
         }
         if mode in convert:
             return convert[mode]
@@ -1528,18 +1531,18 @@ class GitHandler(object):
             # file' case so is overwritten. add first, then rename -- add
             # stored in 'old = file' case, then membership check fails in 'new
             # = file' case so is overwritten.
-            if newmode == 0160000:
+            if newmode == 0o160000:
                 # new = gitlink
                 gitlinks[newfile] = newsha
                 if change.type == diff_tree.CHANGE_RENAME:
                     # don't record the rename because only file -> file renames
                     # make sense in Mercurial
                     gitlinks[oldfile] = None
-                if oldmode is not None and oldmode != 0160000:
+                if oldmode is not None and oldmode != 0o160000:
                     # file -> gitlink
                     files[oldfile] = True, None, None
                 continue
-            if oldmode == 0160000 and newmode != 0160000:
+            if oldmode == 0o160000 and newmode != 0o160000:
                 # gitlink -> no/file (gitlink -> gitlink is covered above)
                 gitlinks[oldfile] = None
                 continue
@@ -1678,16 +1681,16 @@ class GitHandler(object):
         >>> g = GitHandler(mockrepo, ui())
         >>> tp = g.get_transport_and_path
         >>> client, url = tp('http://fqdn.com/test.git')
-        >>> print isinstance(client, HttpGitClient)
+        >>> print(isinstance(client, HttpGitClient))
         True
-        >>> print url
+        >>> print(url)
         http://fqdn.com/test.git
         >>> client, url = tp('git@fqdn.com:user/repo.git')
-        >>> print isinstance(client, SSHGitClient)
+        >>> print(isinstance(client, SSHGitClient))
         True
-        >>> print url
+        >>> print(url)
         user/repo.git
-        >>> print client.host
+        >>> print(client.host)
         git@fqdn.com
         """
         # pass hg's ui.ssh config to dulwich

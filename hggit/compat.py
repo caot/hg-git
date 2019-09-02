@@ -5,6 +5,7 @@ from mercurial import (
     url,
     util as hgutil,
 )
+from . import util
 
 try:
     from mercurial import vfs as vfsmod
@@ -93,14 +94,16 @@ CONFIG_DEFAULTS = {
     }
 }
 
+CONFIG_DEFAULTS = util.convert(CONFIG_DEFAULTS)
+
 hasconfigitems = False
 
 
 def registerconfigs(configitem):
     global hasconfigitems
     hasconfigitems = True
-    for section, items in CONFIG_DEFAULTS.iteritems():
-        for item, default in items.iteritems():
+    for section, items in CONFIG_DEFAULTS.items():
+        for item, default in items.items():
             configitem(section, item, default=default)
 
 
@@ -108,6 +111,9 @@ def config(ui, subtype, section, item):
     if subtype == 'string':
         subtype = ''
     getconfig = getattr(ui, 'config' + subtype)
+
+    section, item = util.to_bytes(section), util.to_bytes(item)
+
     if hasconfigitems:
         return getconfig(section, item)
     return getconfig(section, item, CONFIG_DEFAULTS[section][item])

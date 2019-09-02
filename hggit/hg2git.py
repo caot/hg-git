@@ -11,8 +11,8 @@ from mercurial import (
     error,
 )
 
-import compat
-import util
+from . import compat
+from . import util
 
 
 def parse_subrepos(ctx):
@@ -33,7 +33,7 @@ def audit_git_path(ui, path):
     ...     def configbool(*args):
     ...         return False
     ...     def warn(self, s):
-    ...         print s
+    ...         print(s)
     >>> u = fakeui()
     >>> audit_git_path(u, 'foo/git~100/wat')
     ... # doctest: +ELLIPSIS
@@ -50,8 +50,8 @@ def audit_git_path(ui, path):
     >>> audit_git_path(u, 'this/is/safe')
     """
     dangerous = False
-    for c in path.split(os.path.sep):
-        if encoding.hfsignoreclean(c) == '.git':
+    for c in util.to_str(path).split(os.path.sep):
+        if encoding.hfsignoreclean(util.to_bytes(c)) in ['.git', b'.git']:
             dangerous = True
             break
         elif '~' in c:
@@ -428,11 +428,11 @@ class IncrementalChangesetExporter(object):
         flags = fctx.flags()
 
         if 'l' in flags:
-            mode = 0120000
+            mode = 0o120000   # octal numbers.
         elif 'x' in flags:
-            mode = 0100755
+            mode = 0o100755
         else:
-            mode = 0100644
+            mode = 0o100644
 
         return (dulobjs.TreeEntry(os.path.basename(fctx.path()), mode,
                                   blob_id), blob)
